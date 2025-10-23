@@ -6,6 +6,7 @@ st.set_page_config(
     page_title="Presupuestos Automáticos",
     page_icon="icono.ico"  # Ruta a tu archivo .ico
 )
+st.markdown('<link rel="manifest" href="manifest.json">', unsafe_allow_html=True)
 
 # Datos de la hoja "Tablas" (hardcoded desde tu Excel)
 data_tablas = [
