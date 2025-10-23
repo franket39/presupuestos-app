@@ -4,7 +4,7 @@ from io import BytesIO
 
 st.set_page_config(
     page_title="Presupuestos Automáticos",
-    page_icon="icono.ico"  # Ruta a tu archivo .ico
+    page_icon="icono.png"  # Cambia a PNG aquí
 )
 st.markdown('<link rel="manifest" href="manifest.json">', unsafe_allow_html=True)
 
