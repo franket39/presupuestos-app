@@ -2,6 +2,11 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
+st.set_page_config(
+    page_title="Presupuestos Automáticos",
+    page_icon="icono.ico"  # Ruta a tu archivo .ico
+)
+
 # Datos de la hoja "Tablas" (hardcoded desde tu Excel)
 data_tablas = [
     {'Espesor': 2, 'CR Select': 0, 'Velocidad': 5, 'VDI': 29, 'Tipo de paso': 'Rough (Baja)', 'Búsqueda': '2-0'},
