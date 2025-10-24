@@ -170,7 +170,7 @@ if st.button("Solicitar Presupuesto"):
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gsheets"], scope)
         client = gspread.authorize(creds)
-        sheet = client.open_by_id("TU_SHEET_ID").sheet1 # Reemplaza TU_SHEET_ID con el ID de tu Sheet
+        sheet = client.open_by_id("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").sheet1 # Reemplaza TU_SHEET_ID con el ID de tu Sheet
         emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
         cuerpo = f"Presupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nCosto: {costo} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
         if email.lower() in emails:
