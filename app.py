@@ -1,16 +1,15 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import smtplib
+from email.mime.text import MIMEText
 
-st.set_page_config(
-    page_title="Presupuestos Automáticos",
-    page_icon="icono.png"  # Cambia a PNG aquí
-)
-st.set_page_config(page_title="Presupuestos Automáticos", page_icon="icono.ico")  # O .png
-st.markdown('<link rel="manifest" href="manifest.json">', unsafe_allow_html=True)  # Esto linkea el manifest
+# Config icono y título (igual, si tienes)
+st.set_page_config(page_title="Presupuestos Automáticos", page_icon="icono.png")
 
-
-# Datos de la hoja "Tablas" (hardcoded desde tu Excel)
+# Datos de la hoja "Tablas" (completo como en tu mensaje)
 data_tablas = [
     {'Espesor': 2, 'CR Select': 0, 'Velocidad': 5, 'VDI': 29, 'Tipo de paso': 'Rough (Baja)', 'Búsqueda': '2-0'},
     {'Espesor': 2, 'CR Select': 5, 'Velocidad': 5, 'VDI': 29, 'Tipo de paso': 'Rough (Alta)', 'Búsqueda': '2-5'},
@@ -119,27 +118,23 @@ vdi_to_ra = {
     30: 3.2, 31: 3.5, 32: 4.0, 33: 4.5, 34: 5.0, 35: 5.6, 36: 6.3, 37: 7.0, 38: 8.0, 39: 9.0,
     40: 10.0, 41: 11.2, 42: 12.6, 43: 14.0, 44: 16.0, 45: 18.0
 }
-
-st.title("Calculadora de Presupuestos Automáticos")
-
-# Inputs (simplificados)
-material = "Acero"  # Fijo
+st.title("Solicitud de Presupuesto - Servicorte por Hilo")
+# Inputs
+material = "Acero" # Fijo
 espesor = st.number_input("Espesor (mm)", min_value=2, max_value=200, value=100, step=1)
 calidad = st.selectbox("Calidad", ["Baja", "Media", "Alta"])
 longitud = st.number_input("Longitud corte (mm)", min_value=0.0, value=25.0)
-
+email = st.text_input("Tu email (para enviar presupuesto)")
 # Valores fijos internos
 tasa = 30.0
 costo_fijo = 4.0
-
-# Determinar códigos según calidad
+# Determinar códigos según calidad (pega tu lógica aquí)
 if calidad == "Baja":
     codes = [0]
 elif calidad == "Media":
     codes = [8, 9]
 elif calidad == "Alta":
     codes = [5, 6, 7]
-
 # Encontrar espesor disponible (más cercano inferior)
 available_espesores = sorted(df_tablas['Espesor'].unique())
 if espesor not in available_espesores:
@@ -147,9 +142,8 @@ if espesor not in available_espesores:
     st.warning(f"Espesor {espesor} mm no exacto. Usando el más cercano: {espesor_use} mm.")
 else:
     espesor_use = espesor
-
 # Buscar velocidades y VDI (internamente, no se muestran)
-velocities = [0.0] * 3  # Rough, Repaso1, Repaso2
+velocities = [0.0] * 3
 times = [0.0] * 3
 vdi_final = 0
 for i, code in enumerate(codes):
@@ -161,39 +155,64 @@ for i, code in enumerate(codes):
         velocities[i] = vel
         if vel > 0:
             times[i] = longitud / vel
-        vdi_final = vdi  # Último VDI
-    else:
-        st.error(f"No se encontró datos para {busqueda}. Usando 0.")
-
-# Cálculos (internos)
+        vdi_final = vdi
+# Cálculos
 total_min = sum(times)
 total_h = total_min / 60
 costo = round(total_h * tasa + costo_fijo, 2)
 ra_estimado = f"{vdi_to_ra.get(vdi_final, 'Desconocido')}"
-
-# Datos para resumen simplificado
+# Botón para solicitar
+if st.button("Solicitar Presupuesto"):
+    if not email:
+        st.error("Ingresa tu email.")
+    else:
+        # Conectar a Google Sheet usando secrets
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gsheets"], scope)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_id("TU_SHEET_ID").sheet1 # Reemplaza TU_SHEET_ID con el ID de tu Sheet
+        emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
+        cuerpo = f"Presupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nCosto: {costo} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
+        if email.lower() in emails:
+            # Enviar email al cliente
+            msg = MIMEText(cuerpo)
+            msg['Subject'] = "Tu Presupuesto Servicorte"
+            msg['From'] = "servicorteporhilo@servicorteporhilo.es"
+            msg['To'] = email
+            server = smtplib.SMTP('smtp.nominalia.com', 587) # SMTP de Nominalia
+            server.starttls()
+            server.login(st.secrets["email"]["servicorteporhilo@servicorteporhilo.es"], st.secrets["email"]["47704349Aa"])
+            server.send_message(msg)
+            server.quit()
+            st.success("Presupuesto enviado a tu email.")
+        else:
+            # Enviar notificación a ti
+            msg = MIMEText(f"Nueva solicitud de {email}:\n{cuerpo}")
+            msg['Subject'] = "Nueva Solicitud Presupuesto"
+            msg['From'] = "servicorteporhilo@servicorteporhilo.es"
+            msg['To'] = "servicorteporhilo@servicorteporhilo.es"
+            server = smtplib.SMTP('smtp.nominalia.com', 587)
+            server.starttls()
+            server.login(st.secrets["email"]["servicorteporhilo@servicorteporhilo.es"], st.secrets["email"]["47704349Aa"])
+            server.send_message(msg)
+            server.quit()
+            st.warning("Solicitud enviada. Te contactaremos si eres cliente registrado.")
+# Resumen sin costo
 calc_data = {
     'Descripción': [
         'Material', 'Espesor (mm)', 'Calidad', 'Longitud corte (mm)',
-        'Costo total (€)', 'VDI final', 'Acabado estimado (µm Ra)'
+        'VDI final', 'Acabado estimado (µm Ra)'
     ],
     'Valor': [
         material, espesor, calidad, longitud,
-        costo, vdi_final, ra_estimado
+        vdi_final, ra_estimado
     ]
 }
 df_calc = pd.DataFrame(calc_data)
-
-st.header("Resumen del Presupuesto")
-st.dataframe(df_calc.style.format({"Valor": "{:.2f}" if isinstance(v, float) else "{}" for v in df_calc['Valor']}))
-
-# Descargar como Excel (simplificado)
+st.header("Resumen (presupuesto por email)")
+st.dataframe(df_calc)
+# Descargar (opcional, sin costo)
 output = BytesIO()
 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-    df_calc.to_excel(writer, sheet_name='Presupuesto', index=False)
-st.download_button(
-    label="Descargar como Excel",
-    data=output.getvalue(),
-    file_name="presupuesto.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+    df_calc.to_excel(writer, sheet_name='Resumen', index=False)
+st.download_button("Descargar resumen (sin precio)", output.getvalue(), "resumen.xlsx")
