@@ -6,7 +6,9 @@ st.set_page_config(
     page_title="Presupuestos Automáticos",
     page_icon="icono.png"  # Cambia a PNG aquí
 )
-st.markdown('<link rel="manifest" href="manifest.json">', unsafe_allow_html=True)
+st.set_page_config(page_title="Presupuestos Automáticos", page_icon="icono.ico")  # O .png
+st.markdown('<link rel="manifest" href="manifest.json">', unsafe_allow_html=True)  # Esto linkea el manifest
+
 
 # Datos de la hoja "Tablas" (hardcoded desde tu Excel)
 data_tablas = [
