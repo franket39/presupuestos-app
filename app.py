@@ -192,7 +192,7 @@ if st.button("Solicitar Presupuesto"):
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gsheets"], scope)
         client = gspread.authorize(creds)
-        sheet = client.open_by_key("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0) # Primera hoja
+        sheet = client.open_by_id("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0) # Primera hoja
         emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
 
         cuerpo = f"Presupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nCosto: {costo} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
@@ -218,7 +218,7 @@ if st.button("Solicitar Presupuesto"):
             msg['To'] = "servicorteporhilo@servicorteporhilo.es"  # Tu email para notificaciones
             server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
-            server.login(st.secrets["email"]["user"], st.secrets["pass"])
+            server.login(st.secrets["email"]["user"], st.secrets["email"]["pass"])
             server.send_message(msg)
             server.quit()
             st.warning("Solicitud enviada. Te contactaremos si eres cliente registrado.")
