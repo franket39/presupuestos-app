@@ -136,7 +136,7 @@ st.title("Solicitud de Presupuesto - Servicorte por Hilo")
 # Inputs
 material = "Acero"  # Fijo
 espesor = st.number_input("Espesor (mm)", min_value=2, max_value=200, value=100, step=1)
-calidad = st.selectbox("Calidad", ["Baja", "Media", "Alta"])
+calidad = st.selectbox("Calidad", ["Alta", "Media", "Baja"])  # Alta primero
 longitud = st.number_input("Longitud corte (mm)", min_value=0.0, value=25.0)
 email = st.text_input("Tu email (para enviar presupuesto)")
 
@@ -180,7 +180,7 @@ for i, code in enumerate(codes):
 # Cálculos (internos)
 total_min = sum(times)
 total_h = total_min / 60
-costo = round(total_h * tasa + costo_fijo, 2)
+oferta_aproximada = round(total_h * tasa + costo_fijo, 2)
 ra_estimado = f"{vdi_to_ra.get(vdi_final, 'Desconocido')}"
 
 # Botón para solicitar
@@ -195,33 +195,29 @@ if st.button("Solicitar Presupuesto"):
         sheet = client.open_by_key("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0) # Primera hoja
         emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
 
-        cuerpo = f"Presupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nCosto: {costo} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
+        cuerpo = f"Presupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nOferta aproximada: {oferta_aproximada} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
+
+        # Siempre enviar a ti
+        msg_owner = MIMEText(cuerpo)
+        msg_owner['Subject'] = "Nuevo Presupuesto Solicitado"
+        msg_owner['From'] = st.secrets["email"]["user"]
+        msg_owner['To'] = "servicorteporhilo@servicorteporhilo.es"  # Tu email
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(st.secrets["email"]["user"], st.secrets["email"]["pass"])
+        server.send_message(msg_owner)
 
         if email.lower() in emails:
-            # Enviar email al cliente
-            msg = MIMEText(cuerpo)
-            msg['Subject'] = "Tu Presupuesto Servicorte"
-            msg['From'] = "presupuestoservicorte@gmail.com"
-            msg['To'] = email
-
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(st.secrets["email"]["user"], st.secrets["email"]["pass"])
-            server.send_message(msg)
-            server.quit()
-            st.success("Presupuesto enviado a tu email.")
+            # Enviar al cliente si registrado
+            msg_client = MIMEText(cuerpo)
+            msg_client['Subject'] = "Tu Presupuesto Servicorte"
+            msg_client['From'] = st.secrets["email"]["user"]
+            msg_client['To'] = email
+            server.send_message(msg_client)
+            st.success("Oferta aproximada enviada a tu email.")
         else:
-            # Enviar notificación a ti
-            msg = MIMEText(f"Nueva solicitud de {email}:\n{cuerpo}")
-            msg['Subject'] = "Nueva Solicitud Presupuesto"
-            msg['From'] = "presupuestoservicorte@gmail.com"
-            msg['To'] = "servicorteporhilo@servicorteporhilo.es"  # Tu email para notificaciones
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(st.secrets["email"]["user"], st.secrets["email"]["pass"])
-            server.send_message(msg)
-            server.quit()
-            st.warning("Solicitud enviada. Te contactaremos si eres cliente registrado.")
+            st.warning("Email no registrado. Te contactaremos pronto.")
+        server.quit()
 
 # Resumen sin costo
 calc_data = {
@@ -235,7 +231,7 @@ calc_data = {
     ]
 }
 df_calc = pd.DataFrame(calc_data)
-st.header("Resumen (presupuesto por email)")
+st.header("Resumen (oferta por email)")
 st.dataframe(df_calc)
 
 # Descargar como Excel (sin costo)
@@ -243,7 +239,7 @@ output = BytesIO()
 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
     df_calc.to_excel(writer, sheet_name='Resumen', index=False)
 st.download_button(
-    label="Descargar Resumen (sin precio)",
+    label="Descargar Resumen (sin oferta)",
     data=output.getvalue(),
     file_name="resumen.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
