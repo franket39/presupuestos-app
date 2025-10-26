@@ -6,10 +6,22 @@ from oauth2client.service_account import ServiceAccountCredentials
 import smtplib
 from email.mime.text import MIMEText
 
-# Config icono y título (igual, si tienes)
-st.set_page_config(page_title="Presupuestos Automáticos", page_icon="icono.png")
+# Config icono y título (sin duplicados)
+st.set_page_config(page_title="Presupuestos Automáticos", page_icon="icono.png")  # Usa PNG, o cambia a "icono.ico"
 
-# Datos de la hoja "Tablas" (completo como en tu mensaje)
+# Link al manifest (si tienes)
+st.markdown('<link rel="manifest" href="manifest.json">', unsafe_allow_html=True)  # Esto linkea el manifest
+
+# Test de conexión a Google (para depurar)
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+try:
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gsheets"], scope)
+    client = gspread.authorize(creds)
+    st.success("Conexión a Google OK.")
+except Exception as e:
+    st.error(f"Error en conexión: {str(e)}")
+
+# Datos de la hoja "Tablas" (hardcoded desde tu Excel)
 data_tablas = [
     {'Espesor': 2, 'CR Select': 0, 'Velocidad': 5, 'VDI': 29, 'Tipo de paso': 'Rough (Baja)', 'Búsqueda': '2-0'},
     {'Espesor': 2, 'CR Select': 5, 'Velocidad': 5, 'VDI': 29, 'Tipo de paso': 'Rough (Alta)', 'Búsqueda': '2-5'},
@@ -118,23 +130,28 @@ vdi_to_ra = {
     30: 3.2, 31: 3.5, 32: 4.0, 33: 4.5, 34: 5.0, 35: 5.6, 36: 6.3, 37: 7.0, 38: 8.0, 39: 9.0,
     40: 10.0, 41: 11.2, 42: 12.6, 43: 14.0, 44: 16.0, 45: 18.0
 }
+
 st.title("Solicitud de Presupuesto - Servicorte por Hilo")
+
 # Inputs
-material = "Acero" # Fijo
+material = "Acero"  # Fijo
 espesor = st.number_input("Espesor (mm)", min_value=2, max_value=200, value=100, step=1)
 calidad = st.selectbox("Calidad", ["Baja", "Media", "Alta"])
 longitud = st.number_input("Longitud corte (mm)", min_value=0.0, value=25.0)
 email = st.text_input("Tu email (para enviar presupuesto)")
+
 # Valores fijos internos
 tasa = 30.0
 costo_fijo = 4.0
-# Determinar códigos según calidad (pega tu lógica aquí)
+
+# Determinar códigos según calidad
 if calidad == "Baja":
     codes = [0]
 elif calidad == "Media":
     codes = [8, 9]
 elif calidad == "Alta":
     codes = [5, 6, 7]
+
 # Encontrar espesor disponible (más cercano inferior)
 available_espesores = sorted(df_tablas['Espesor'].unique())
 if espesor not in available_espesores:
@@ -142,8 +159,9 @@ if espesor not in available_espesores:
     st.warning(f"Espesor {espesor} mm no exacto. Usando el más cercano: {espesor_use} mm.")
 else:
     espesor_use = espesor
+
 # Buscar velocidades y VDI (internamente, no se muestran)
-velocities = [0.0] * 3
+velocities = [0.0] * 3 # Rough, Repaso1, Repaso2
 times = [0.0] * 3
 vdi_final = 0
 for i, code in enumerate(codes):
@@ -155,33 +173,40 @@ for i, code in enumerate(codes):
         velocities[i] = vel
         if vel > 0:
             times[i] = longitud / vel
-        vdi_final = vdi
-# Cálculos
+        vdi_final = vdi # Último VDI
+    else:
+        st.error(f"No se encontró datos para {busqueda}. Usando 0.")
+
+# Cálculos (internos)
 total_min = sum(times)
 total_h = total_min / 60
 costo = round(total_h * tasa + costo_fijo, 2)
 ra_estimado = f"{vdi_to_ra.get(vdi_final, 'Desconocido')}"
+
 # Botón para solicitar
 if st.button("Solicitar Presupuesto"):
     if not email:
         st.error("Ingresa tu email.")
     else:
-        # Conectar a Google Sheet usando secrets
+        # Conectar a Google Sheet usando local JSON
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gsheets"], scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
         client = gspread.authorize(creds)
-        sheet = client.open_by_id("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0)  # Primera hoja
+        sheet = client.open_by_id("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0) # Primera hoja
         emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
+
         cuerpo = f"Presupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nCosto: {costo} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
+
         if email.lower() in emails:
             # Enviar email al cliente
             msg = MIMEText(cuerpo)
             msg['Subject'] = "Tu Presupuesto Servicorte"
-            msg['From'] = "servicorteporhilo@servicorteporhilo.es"
+            msg['From'] = "presupuestoservicorte@gmail.com"  # Nuevo Gmail
             msg['To'] = email
-            server = smtplib.SMTP('smtp.nominalia.com', 587) # SMTP de Nominalia
+
+            server = smtplib.SMTP('smtp.gmail.com', 587) # SMTP de Gmail
             server.starttls()
-            server.login(st.secrets["email"]["servicorteporhilo@servicorteporhilo.es"], st.secrets["email"]["47704349Aa"])
+            server.login("presupuestoservicorte@gmail.com", "hcgz iuxw vpiz uyny") # Tu contraseña de app
             server.send_message(msg)
             server.quit()
             st.success("Presupuesto enviado a tu email.")
@@ -189,14 +214,15 @@ if st.button("Solicitar Presupuesto"):
             # Enviar notificación a ti
             msg = MIMEText(f"Nueva solicitud de {email}:\n{cuerpo}")
             msg['Subject'] = "Nueva Solicitud Presupuesto"
-            msg['From'] = "servicorteporhilo@servicorteporhilo.es"
-            msg['To'] = "servicorteporhilo@servicorteporhilo.es"
-            server = smtplib.SMTP('smtp.nominalia.com', 587)
+            msg['From'] = "presupuestoservicorte@gmail.com"  # Nuevo Gmail
+            msg['To'] = "servicorteporhilo@servicorteporhilo.es"  # Tu email para notificaciones
+            server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
-            server.login(st.secrets["email"]["servicorteporhilo@servicorteporhilo.es"], st.secrets["email"]["47704349Aa"])
+            server.login("presupuestoservicorte@gmail.com", "hcgz iuxw vpiz uyny") # Igual
             server.send_message(msg)
             server.quit()
             st.warning("Solicitud enviada. Te contactaremos si eres cliente registrado.")
+
 # Resumen sin costo
 calc_data = {
     'Descripción': [
@@ -211,8 +237,14 @@ calc_data = {
 df_calc = pd.DataFrame(calc_data)
 st.header("Resumen (presupuesto por email)")
 st.dataframe(df_calc)
-# Descargar (opcional, sin costo)
+
+# Descargar como Excel (sin costo)
 output = BytesIO()
 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
     df_calc.to_excel(writer, sheet_name='Resumen', index=False)
-st.download_button("Descargar resumen (sin precio)", output.getvalue(), "resumen.xlsx")
+st.download_button(
+    label="Descargar Resumen (sin precio)",
+    data=output.getvalue(),
+    file_name="resumen.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
