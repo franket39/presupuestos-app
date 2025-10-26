@@ -195,7 +195,7 @@ if st.button("Solicitar Presupuesto"):
         sheet = client.open_by_key("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0) # Primera hoja
         emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
 
-        cuerpo = f"Presupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nOferta aproximada: {oferta_aproximada} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
+        cuerpo = f"Solicitado por: {email}\nPresupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nOferta aproximada: {oferta_aproximada} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
 
         # Siempre enviar a ti
         msg_owner = MIMEText(cuerpo)
