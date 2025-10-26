@@ -188,9 +188,9 @@ if st.button("Solicitar Presupuesto"):
     if not email:
         st.error("Ingresa tu email.")
     else:
-        # Conectar a Google Sheet usando local JSON
+        # Conectar a Google Sheet usando secrets
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gsheets"], scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_id("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0) # Primera hoja
         emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
@@ -201,12 +201,12 @@ if st.button("Solicitar Presupuesto"):
             # Enviar email al cliente
             msg = MIMEText(cuerpo)
             msg['Subject'] = "Tu Presupuesto Servicorte"
-            msg['From'] = "presupuestoservicorte@gmail.com"  # Nuevo Gmail
+            msg['From'] = "presupuestoservicorte@gmail.com"
             msg['To'] = email
 
-            server = smtplib.SMTP('smtp.gmail.com', 587) # SMTP de Gmail
+            server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
-            server.login("presupuestoservicorte@gmail.com", "hcgz iuxw vpiz uyny") # Tu contraseña de app
+            server.login(st.secrets["email"]["user"], st.secrets["email"]["pass"])
             server.send_message(msg)
             server.quit()
             st.success("Presupuesto enviado a tu email.")
@@ -214,11 +214,11 @@ if st.button("Solicitar Presupuesto"):
             # Enviar notificación a ti
             msg = MIMEText(f"Nueva solicitud de {email}:\n{cuerpo}")
             msg['Subject'] = "Nueva Solicitud Presupuesto"
-            msg['From'] = "presupuestoservicorte@gmail.com"  # Nuevo Gmail
+            msg['From'] = "presupuestoservicorte@gmail.com"
             msg['To'] = "servicorteporhilo@servicorteporhilo.es"  # Tu email para notificaciones
             server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
-            server.login("presupuestoservicorte@gmail.com", "hcgz iuxw vpiz uyny") # Igual
+            server.login(st.secrets["email"]["user"], st.secrets["pass"])
             server.send_message(msg)
             server.quit()
             st.warning("Solicitud enviada. Te contactaremos si eres cliente registrado.")
