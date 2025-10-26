@@ -195,7 +195,10 @@ if st.button("Solicitar Presupuesto"):
         sheet = client.open_by_key("1kvFRBl2mpD-VmNMv5IAmN0tDhGZw3d6Sue1KVIJtV80").get_worksheet(0) # Primera hoja
         emails = [row[0].lower() for row in sheet.get_all_values()[1:] if row]
 
-        cuerpo = f"Solicitado por: {email}\nPresupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nOferta aproximada: {oferta_aproximada} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
+        registrado = email.lower() in emails
+        status = "Cliente registrado" if registrado else "Nuevo cliente"
+
+        cuerpo = f"{status}: {email}\nPresupuesto:\nMaterial: {material}\nEspesor: {espesor} mm\nCalidad: {calidad}\nLongitud: {longitud} mm\nOferta aproximada: {oferta_aproximada} €\nVDI: {vdi_final}\nRa: {ra_estimado}"
 
         # Siempre enviar a ti
         msg_owner = MIMEText(cuerpo)
@@ -207,7 +210,7 @@ if st.button("Solicitar Presupuesto"):
         server.login(st.secrets["email"]["user"], st.secrets["email"]["pass"])
         server.send_message(msg_owner)
 
-        if email.lower() in emails:
+        if registrado:
             # Enviar al cliente si registrado
             msg_client = MIMEText(cuerpo)
             msg_client['Subject'] = "Tu Presupuesto Servicorte"
